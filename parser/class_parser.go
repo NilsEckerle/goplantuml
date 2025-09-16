@@ -579,69 +579,112 @@ func (p *ClassParser) handleGenDecl(decl *ast.GenDecl) {
 }
 
 func (p *ClassParser) processSpec(spec ast.Spec) {
-	var typeName string
-	var alias *Alias
-	declarationType := "alias"
-	switch v := spec.(type) {
-	case *ast.TypeSpec:
-		typeName = v.Name.Name
-		switch c := v.Type.(type) {
-		case *ast.StructType:
-			// Parse generic type parameters if present
-			if v.TypeParams != nil && len(v.TypeParams.List) > 0 {
-				if st := p.getOrCreateStruct(typeName); st != nil {
-					st.TypeParameters = parseTypeParameters(v.TypeParams, p.allImports)
-				}
-			}
-			declarationType = "class"
-			handleGenDecStructType(p, typeName, c)
-		case *ast.InterfaceType:
-			// Parse generic type parameters if present
-			if v.TypeParams != nil && len(v.TypeParams.List) > 0 {
-				if st := p.getOrCreateStruct(typeName); st != nil {
-					st.TypeParameters = parseTypeParameters(v.TypeParams, p.allImports)
-				}
-			}
-			declarationType = "interface"
-			handleGenDecInterfaceType(p, typeName, c)
-		default:
-			basicType, _ := getFieldType(getBasicType(c), p.allImports)
-
-			aliasType, _ := getFieldType(c, p.allImports)
-			aliasType = replacePackageConstant(aliasType, "")
-			if !isPrimitiveString(typeName) {
-				typeName = fmt.Sprintf("%s.%s", p.currentPackageName, typeName)
-			}
-			packageName := p.currentPackageName
-			if isPrimitiveString(basicType) {
-				packageName = builtinPackageName
-			}
-			alias = getNewAlias(fmt.Sprintf("%s.%s", packageName, aliasType), p.currentPackageName, typeName)
-
-		}
-	default:
+	typeSpec, ok := spec.(*ast.TypeSpec)
+	if !ok {
 		// Not needed for class diagrams (Imports, global variables, regular functions, etc)
 		return
 	}
+
+	typeName, declarationType, alias := p.processTypeSpec(typeSpec)
+	
 	if structure := p.getOrCreateStruct(typeName); structure != nil {
 		structure.Type = declarationType
 	}
+	
+	p.registerDeclaration(typeName, declarationType, alias)
+}
+
+// processTypeSpec handles the processing of a TypeSpec and returns type name, declaration type, and alias
+func (p *ClassParser) processTypeSpec(typeSpec *ast.TypeSpec) (string, string, *Alias) {
+	typeName := typeSpec.Name.Name
+	declarationType := "alias"
+	var alias *Alias
+
+	switch c := typeSpec.Type.(type) {
+	case *ast.StructType:
+		declarationType = "class"
+		p.processStructType(typeSpec, typeName, c)
+	case *ast.InterfaceType:
+		declarationType = "interface"
+		p.processInterfaceType(typeSpec, typeName, c)
+	default:
+		alias = p.processAliasType(typeSpec, typeName, c)
+		// For aliases, we need to use the full name for the structure
+		if alias != nil {
+			typeName = alias.AliasOf
+		}
+	}
+
+	return typeName, declarationType, alias
+}
+
+// processStructType handles struct type processing including generic parameters
+func (p *ClassParser) processStructType(typeSpec *ast.TypeSpec, typeName string, structType *ast.StructType) {
+	p.parseGenericTypeParameters(typeSpec, typeName)
+	handleGenDecStructType(p, typeName, structType)
+}
+
+// processInterfaceType handles interface type processing including generic parameters
+func (p *ClassParser) processInterfaceType(typeSpec *ast.TypeSpec, typeName string, interfaceType *ast.InterfaceType) {
+	p.parseGenericTypeParameters(typeSpec, typeName)
+	handleGenDecInterfaceType(p, typeName, interfaceType)
+}
+
+// processAliasType handles alias type processing
+func (p *ClassParser) processAliasType(typeSpec *ast.TypeSpec, typeName string, typeExpr ast.Expr) *Alias {
+	basicType, _ := getFieldType(getBasicType(typeExpr), p.allImports)
+	aliasType, _ := getFieldType(typeExpr, p.allImports)
+	aliasType = replacePackageConstant(aliasType, "")
+	
+	// For aliases, we need to create the full name with package
+	fullTypeName := typeName
+	if !isPrimitiveString(typeName) {
+		fullTypeName = fmt.Sprintf("%s.%s", p.currentPackageName, typeName)
+	}
+	
+	packageName := p.currentPackageName
+	if isPrimitiveString(basicType) {
+		packageName = builtinPackageName
+	}
+	
+	return getNewAlias(fmt.Sprintf("%s.%s", packageName, aliasType), p.currentPackageName, fullTypeName)
+}
+
+// parseGenericTypeParameters extracts and sets type parameters for a type spec
+func (p *ClassParser) parseGenericTypeParameters(typeSpec *ast.TypeSpec, typeName string) {
+	if typeSpec.TypeParams != nil && len(typeSpec.TypeParams.List) > 0 {
+		if st := p.getOrCreateStruct(typeName); st != nil {
+			st.TypeParameters = parseTypeParameters(typeSpec.TypeParams, p.allImports)
+		}
+	}
+}
+
+// registerDeclaration registers the declaration in the appropriate collections
+func (p *ClassParser) registerDeclaration(typeName, declarationType string, alias *Alias) {
 	fullName := fmt.Sprintf("%s.%s", p.currentPackageName, typeName)
+	
 	switch declarationType {
 	case "interface":
 		p.allInterfaces[fullName] = struct{}{}
 	case "class":
 		p.allStructs[fullName] = struct{}{}
 	case "alias":
-		p.allAliases[typeName] = alias
-		if strings.Count(alias.Name, ".") > 1 {
-			pack := strings.SplitN(alias.Name, ".", 2)
-			if _, ok := p.allRenamedStructs[pack[0]]; !ok {
-				p.allRenamedStructs[pack[0]] = map[string]string{}
-			}
-			renamedClass := generateRenamedStructName(pack[1])
-			p.allRenamedStructs[pack[0]][renamedClass] = pack[1]
+		p.registerAlias(typeName, alias)
+	}
+}
+
+// registerAlias handles alias registration including renamed structs
+func (p *ClassParser) registerAlias(typeName string, alias *Alias) {
+	// Use the full name from the alias for registration
+	fullName := alias.AliasOf
+	p.allAliases[fullName] = alias
+	if strings.Count(alias.Name, ".") > 1 {
+		pack := strings.SplitN(alias.Name, ".", 2)
+		if _, ok := p.allRenamedStructs[pack[0]]; !ok {
+			p.allRenamedStructs[pack[0]] = map[string]string{}
 		}
+		renamedClass := generateRenamedStructName(pack[1])
+		p.allRenamedStructs[pack[0]][renamedClass] = pack[1]
 	}
 }
 
