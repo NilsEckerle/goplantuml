@@ -519,7 +519,14 @@ func (p *ClassParser) handleFuncDecl(decl *ast.FuncDecl) {
 		if len(theType) > 0 && theType[0] == "*"[0] {
 			theType = theType[1:]
 		}
+		// Skip functions with empty or invalid receiver types (e.g., malformed syntax)
+		if theType == "" {
+			return
+		}
 		structure := p.getOrCreateStruct(theType)
+		if structure == nil {
+			return
+		}
 		if structure.Type == "" {
 			structure.Type = "class"
 		}
@@ -538,7 +545,9 @@ func (p *ClassParser) handleFuncDecl(decl *ast.FuncDecl) {
 
 func handleGenDecStructType(p *ClassParser, typeName string, c *ast.StructType) {
 	for _, f := range c.Fields.List {
-		p.getOrCreateStruct(typeName).AddField(f, p.allImports)
+		if structure := p.getOrCreateStruct(typeName); structure != nil {
+			structure.AddField(f, p.allImports)
+		}
 	}
 }
 
@@ -546,12 +555,15 @@ func handleGenDecInterfaceType(p *ClassParser, typeName string, c *ast.Interface
 	for _, f := range c.Methods.List {
 		switch t := f.Type.(type) {
 		case *ast.FuncType:
-			p.getOrCreateStruct(typeName).AddMethod(f, p.allImports)
+			if structure := p.getOrCreateStruct(typeName); structure != nil {
+				structure.AddMethod(f, p.allImports)
+			}
 		case *ast.Ident:
 			f, _ := getFieldType(t, p.allImports)
-			st := p.getOrCreateStruct(typeName)
-			f = replacePackageConstant(f, st.PackageName)
-			st.AddToComposition(f)
+			if st := p.getOrCreateStruct(typeName); st != nil {
+				f = replacePackageConstant(f, st.PackageName)
+				st.AddToComposition(f)
+			}
 		}
 	}
 }
@@ -577,16 +589,18 @@ func (p *ClassParser) processSpec(spec ast.Spec) {
 		case *ast.StructType:
 			// Parse generic type parameters if present
 			if v.TypeParams != nil && len(v.TypeParams.List) > 0 {
-				st := p.getOrCreateStruct(typeName)
-				st.TypeParameters = parseTypeParameters(v.TypeParams, p.allImports)
+				if st := p.getOrCreateStruct(typeName); st != nil {
+					st.TypeParameters = parseTypeParameters(v.TypeParams, p.allImports)
+				}
 			}
 			declarationType = "class"
 			handleGenDecStructType(p, typeName, c)
 		case *ast.InterfaceType:
 			// Parse generic type parameters if present
 			if v.TypeParams != nil && len(v.TypeParams.List) > 0 {
-				st := p.getOrCreateStruct(typeName)
-				st.TypeParameters = parseTypeParameters(v.TypeParams, p.allImports)
+				if st := p.getOrCreateStruct(typeName); st != nil {
+					st.TypeParameters = parseTypeParameters(v.TypeParams, p.allImports)
+				}
 			}
 			declarationType = "interface"
 			handleGenDecInterfaceType(p, typeName, c)
@@ -609,7 +623,9 @@ func (p *ClassParser) processSpec(spec ast.Spec) {
 		// Not needed for class diagrams (Imports, global variables, regular functions, etc)
 		return
 	}
-	p.getOrCreateStruct(typeName).Type = declarationType
+	if structure := p.getOrCreateStruct(typeName); structure != nil {
+		structure.Type = declarationType
+	}
 	fullName := fmt.Sprintf("%s.%s", p.currentPackageName, typeName)
 	switch declarationType {
 	case "interface":
@@ -1288,6 +1304,10 @@ func (p *ClassParser) renderStructFields(structure *Struct, privateFields *LineS
 
 // Returns an initialized struct of the given name or returns the existing one if it was already created
 func (p *ClassParser) getOrCreateStruct(name string) *Struct {
+	// Skip empty or invalid struct names to prevent PlantUML syntax errors
+	if name == "" {
+		return nil
+	}
 	result, ok := p.structure[p.currentPackageName][name]
 	if !ok {
 		result = &Struct{
