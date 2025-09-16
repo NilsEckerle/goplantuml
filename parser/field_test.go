@@ -3,6 +3,7 @@ package parser
 import (
 	"fmt"
 	"reflect"
+	"strings"
 	"testing"
 
 	"go/ast"
@@ -10,6 +11,46 @@ import (
 
 type NoMatchField struct {
 	ast.Expr
+}
+
+func TestGetFieldTypeWithGenerics(t *testing.T) {
+	tests := []struct {
+		name     string
+		expr     ast.Expr
+		expected string
+	}{
+		{
+			name:     "IndexExpr with single type parameter",
+			expr:     &ast.IndexExpr{X: &ast.Ident{Name: "Model"}, Index: &ast.Ident{Name: "T"}},
+			expected: "Model",
+		},
+		{
+			name:     "IndexListExpr with multiple type parameters",
+			expr:     &ast.IndexListExpr{X: &ast.Ident{Name: "Container"}, Indices: []ast.Expr{&ast.Ident{Name: "T"}, &ast.Ident{Name: "U"}}},
+			expected: "Container",
+		},
+		{
+			name:     "IndexExpr with selector expression",
+			expr:     &ast.IndexExpr{X: &ast.SelectorExpr{X: &ast.Ident{Name: "pkg"}, Sel: &ast.Ident{Name: "Generic"}}, Index: &ast.Ident{Name: "T"}},
+			expected: "pkg.Generic",
+		},
+		{
+			name:     "IndexExpr with array type",
+			expr:     &ast.IndexExpr{X: &ast.ArrayType{Elt: &ast.Ident{Name: "Model"}}, Index: &ast.Ident{Name: "T"}},
+			expected: "[]{packageName}Model",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, _ := getFieldType(tt.expr, map[string]string{})
+			// Remove package constant prefix for comparison
+			result = strings.TrimPrefix(result, "{packageName}")
+			if result != tt.expected {
+				t.Errorf("Expected %s, got %s", tt.expected, result)
+			}
+		})
+	}
 }
 
 func TestGetFieldType(t *testing.T) {

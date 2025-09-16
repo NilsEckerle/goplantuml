@@ -188,7 +188,7 @@ func TestRenderStructures(t *testing.T) {
 	lineB := &LineStringBuilder{}
 	parser := getEmptyParser("main")
 	parser.renderStructures("main", structMap, lineB)
-	expectedResult := "namespace main {\n    class MainClass << (S,Aquamarine) >> {\n        - privateField int\n\n        + PublicField error\n\n        - foo( int,  string) (error, int)\n\n        + Boo( string,  int) int\n\n    }\n}\n\"foopack.AnotherClass\" *-- \"main.MainClass\"\n\n\"main.NewClass\" <|-- \"main.MainClass\"\n\n"
+	expectedResult := "namespace main {\n    class \"MainClass\" << (S,Aquamarine) >> {\n        - privateField int\n\n        + PublicField error\n\n        - foo( int,  string) (error, int)\n\n        + Boo( string,  int) int\n\n    }\n}\n\"foopack.AnotherClass\" *-- \"main.MainClass\"\n\n\"main.NewClass\" <|-- \"main.MainClass\"\n\n\n"
 	if lineB.String() != expectedResult {
 		t.Errorf("TestRenderStructures: expected %s, got %s", expectedResult, lineB.String())
 	}
@@ -205,7 +205,7 @@ func TestRenderStructures(t *testing.T) {
 		RenderAggregations: true,
 	})
 	parser.renderStructures("main", structMap, lineB)
-	expectedResult = "namespace main {\n    class MainClass << (S,Aquamarine) >> {\n        - privateField int\n\n        + PublicField error\n\n        - foo( int,  string) (error, int)\n\n        + Boo( string,  int) int\n\n    }\n}\n\"foopack.AnotherClass\" *-- \"main.MainClass\"\n\n\"main.NewClass\" <|-- \"main.MainClass\"\n\n\"main.MainClass\" o-- \"main.File\"\n\n"
+	expectedResult = "namespace main {\n    class \"MainClass\" << (S,Aquamarine) >> {\n        - privateField int\n\n        + PublicField error\n\n        - foo( int,  string) (error, int)\n\n        + Boo( string,  int) int\n\n    }\n}\n\"foopack.AnotherClass\" *-- \"main.MainClass\"\n\n\"main.NewClass\" <|-- \"main.MainClass\"\n\n\"main.MainClass\" o-- \"main.File\"\n\n\n"
 	if lineB.String() != expectedResult {
 		t.Errorf("TestRenderStructures: expected %s, got %s", expectedResult, lineB.String())
 	}
@@ -217,7 +217,7 @@ func TestRenderStructures(t *testing.T) {
 		AggregatePrivateMembers: true,
 	})
 	parser.renderStructures("main", structMap, lineB)
-	expectedResult = "namespace main {\n    class MainClass << (S,Aquamarine) >> {\n        - privateField int\n\n        + PublicField error\n\n        - foo( int,  string) (error, int)\n\n        + Boo( string,  int) int\n\n    }\n}\n\"foopack.AnotherClass\" *-- \"main.MainClass\"\n\n\"main.NewClass\" <|-- \"main.MainClass\"\n\n\"main.MainClass\" o-- \"main.File\"\n\"main.MainClass\" o-- \"main.File2\"\n\n"
+	expectedResult = "namespace main {\n    class \"MainClass\" << (S,Aquamarine) >> {\n        - privateField int\n\n        + PublicField error\n\n        - foo( int,  string) (error, int)\n\n        + Boo( string,  int) int\n\n    }\n}\n\"foopack.AnotherClass\" *-- \"main.MainClass\"\n\n\"main.NewClass\" <|-- \"main.MainClass\"\n\n\"main.MainClass\" o-- \"main.File\"\n\"main.MainClass\" o-- \"main.File2\"\n\n\n"
 	if lineB.String() != expectedResult {
 		t.Errorf("TestRenderStructures: expected %s, got %s", expectedResult, lineB.String())
 	}
@@ -230,8 +230,9 @@ func TestRenderStructure(t *testing.T) {
 	compositionBuilder := &LineStringBuilder{}
 	extendBuilder := &LineStringBuilder{}
 	aggregationsBuilder := &LineStringBuilder{}
-	parser.renderStructure(st, "main", "TestClass", lineBuilder, compositionBuilder, extendBuilder, aggregationsBuilder)
-	expectedLineBuilder := "    class TestClass << (S,Aquamarine) >> {\n        - privateField int\n\n        + PublicField error\n\n        - foo( int,  string) (error, int)\n\n        + Boo( string,  int) int\n\n    }\n"
+	paramsBuilder := &LineStringBuilder{}
+	parser.renderStructure(st, "main", "TestClass", lineBuilder, compositionBuilder, extendBuilder, aggregationsBuilder, paramsBuilder)
+	expectedLineBuilder := "    class \"TestClass\" << (S,Aquamarine) >> {\n        - privateField int\n\n        + PublicField error\n\n        - foo( int,  string) (error, int)\n\n        + Boo( string,  int) int\n\n    }\n"
 	if lineBuilder.String() != expectedLineBuilder {
 		t.Errorf("TestRenderStructure: Expected lineBuilder [%s] got [%s]", expectedLineBuilder, lineBuilder.String())
 	}
@@ -833,13 +834,14 @@ func TestRenderingOptions(t *testing.T) {
 			},
 			ExpectedResult: `@startuml
 namespace renderingoptions {
-    class Test << (S,Aquamarine) >> {
+    class "Test" << (S,Aquamarine) >> {
         - integer int
 
         - function() 
 
     }
 }
+
 
 
 @enduml
@@ -853,13 +855,14 @@ namespace renderingoptions {
 			},
 			ExpectedResult: `@startuml
 namespace renderingoptions {
-    class Test << (S,Aquamarine) >> {
+    class "Test" << (S,Aquamarine) >> {
         - integer int
 
         - function() 
 
     }
 }
+
 
 
 hide fields
@@ -874,13 +877,14 @@ hide fields
 			},
 			ExpectedResult: `@startuml
 namespace renderingoptions {
-    class Test << (S,Aquamarine) >> {
+    class "Test" << (S,Aquamarine) >> {
         - integer int
 
         - function() 
 
     }
 }
+
 
 
 @enduml
@@ -894,13 +898,14 @@ namespace renderingoptions {
 			},
 			ExpectedResult: `@startuml
 namespace renderingoptions {
-    class Test << (S,Aquamarine) >> {
+    class "Test" << (S,Aquamarine) >> {
         - integer int
 
         - function() 
 
     }
 }
+
 
 
 hide methods
@@ -912,9 +917,10 @@ hide methods
 			RenderingOptions: map[RenderingOption]interface{}{},
 			ExpectedResult: `@startuml
 namespace renderingoptions {
-    class Test << (S,Aquamarine) >> {
+    class "Test" << (S,Aquamarine) >> {
     }
 }
+
 
 
 @enduml
@@ -964,17 +970,17 @@ func TestConnectionLabelsRendering(t *testing.T) {
 	result := parser.Render()
 	expectedResult := `@startuml
 namespace connectionlabels {
-    interface AbstractInterface  {
+    interface "AbstractInterface"  {
         - interfaceFunction() bool
 
     }
-    class ImplementsAbstractInterface << (S,Aquamarine) >> {
+    class "ImplementsAbstractInterface" << (S,Aquamarine) >> {
         + PublicUse AbstractInterface
 
         - interfaceFunction() bool
 
     }
-    class connectionlabels.AliasOfInt << (T, #FF7700) >>  {
+    class "connectionlabels.AliasOfInt" << (T, #FF7700) >>  {
     }
 }
 "__builtin__.int" #.. "alias of""connectionlabels.AliasOfInt"
@@ -983,6 +989,7 @@ namespace connectionlabels {
 "connectionlabels.AbstractInterface" <|-- "implements""connectionlabels.ImplementsAbstractInterface"
 
 "connectionlabels.ImplementsAbstractInterface""uses" o-- "connectionlabels.AbstractInterface"
+
 
 @enduml
 `
@@ -1036,15 +1043,16 @@ func TestParametrizedTypeDeclarations(t *testing.T) {
 	result := parser.Render()
 	expectedResult := `@startuml
 namespace parenthesizedtypedeclarations {
-    interface Bar  {
+    interface "Bar"  {
         + Bar() 
 
     }
-    interface Foo  {
+    interface "Foo"  {
         + Foo() 
 
     }
 }
+
 
 
 @enduml
@@ -1065,10 +1073,11 @@ func TestNamedImportsInAnonymousFields(t *testing.T) {
 	result := parser.Render()
 	expectedResult := `@startuml
 namespace namedimports {
-    class MyType << (S,Aquamarine) >> {
+    class "MyType" << (S,Aquamarine) >> {
     }
 }
 "time.Duration" *-- "namedimports.MyType"
+
 
 
 @enduml
