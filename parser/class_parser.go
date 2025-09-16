@@ -573,16 +573,21 @@ func (p *ClassParser) processSpec(spec ast.Spec) {
 	switch v := spec.(type) {
 	case *ast.TypeSpec:
 		typeName = v.Name.Name
-		// Parse generic type parameters if present
-		if v.TypeParams != nil && len(v.TypeParams.List) > 0 {
-			st := p.getOrCreateStruct(typeName)
-			st.TypeParameters = parseTypeParameters(v.TypeParams, p.allImports)
-		}
 		switch c := v.Type.(type) {
 		case *ast.StructType:
+			// Parse generic type parameters if present
+			if v.TypeParams != nil && len(v.TypeParams.List) > 0 {
+				st := p.getOrCreateStruct(typeName)
+				st.TypeParameters = parseTypeParameters(v.TypeParams, p.allImports)
+			}
 			declarationType = "class"
 			handleGenDecStructType(p, typeName, c)
 		case *ast.InterfaceType:
+			// Parse generic type parameters if present
+			if v.TypeParams != nil && len(v.TypeParams.List) > 0 {
+				st := p.getOrCreateStruct(typeName)
+				st.TypeParameters = parseTypeParameters(v.TypeParams, p.allImports)
+			}
 			declarationType = "interface"
 			handleGenDecInterfaceType(p, typeName, c)
 		default:
@@ -1085,18 +1090,25 @@ func (p *ClassParser) renderStructureWithGenerics(structure *Struct, pack string
 		renderStructureType = "class"
 
 	}
-	// Build display name including type parameters if present
+	// Build display name and alias for generic classes
 	displayName := name
+	aliasName := ""
 	if len(structure.TypeParameters) > 0 {
 		paramNames := make([]string, 0, len(structure.TypeParameters))
 		for _, tp := range structure.TypeParameters {
 			paramNames = append(paramNames, tp.Name)
 		}
-		displayName = fmt.Sprintf("%s[%s]", name, strings.Join(paramNames, ", "))
-		// Generic stereotype
-		sType = "<<generic>>"
+		// Create unique alias for generic class
+		aliasName = fmt.Sprintf("%s_generic_%s", name, strings.Join(paramNames, "_"))
+		// Use type parameters in stereotype instead of brackets in name
+		sType = fmt.Sprintf("<<[%s]>>", strings.Join(paramNames, ", "))
 	}
-	str.WriteLineWithDepth(1, fmt.Sprintf(`%s "%s" %s {`, renderStructureType, displayName, sType))
+	// Render class with alias if generic
+	if aliasName != "" {
+		str.WriteLineWithDepth(1, fmt.Sprintf(`%s "%s" as %s %s {`, renderStructureType, displayName, aliasName, sType))
+	} else {
+		str.WriteLineWithDepth(1, fmt.Sprintf(`%s "%s" %s {`, renderStructureType, displayName, sType))
+	}
 	p.renderStructFields(structure, privateFields, publicFields)
 	p.renderStructMethods(structure, privateMethods, publicMethods)
 	p.renderCompositions(structure, name, composition)
@@ -1118,6 +1130,11 @@ func (p *ClassParser) renderStructureWithGenerics(structure *Struct, pack string
 
 	// Render type parameter classes and enqueue relationships (deduped)
 	if len(structure.TypeParameters) > 0 {
+		// Use alias name for connections if available
+		connectionName := displayName
+		if aliasName != "" {
+			connectionName = aliasName
+		}
 		for _, tp := range structure.TypeParameters {
 			if _, ok := emittedTypeParamClass[tp.Name]; !ok {
 				str.WriteLineWithDepth(1, fmt.Sprintf(`class "%s" <<type parameter>> {`, tp.Name))
@@ -1125,9 +1142,9 @@ func (p *ClassParser) renderStructureWithGenerics(structure *Struct, pack string
 				str.WriteLineWithDepth(1, "}")
 				emittedTypeParamClass[tp.Name] = struct{}{}
 			}
-			linkKey := tp.Name + "<-" + displayName
+			linkKey := tp.Name + "<-" + connectionName
 			if _, ok := emittedParamLink[linkKey]; !ok {
-				params.WriteLineWithDepth(0, fmt.Sprintf(`"%s" <-- "param" "%s"`, tp.Name, displayName))
+				params.WriteLineWithDepth(0, fmt.Sprintf(`"%s" <-- "param" "%s"`, tp.Name, connectionName))
 				emittedParamLink[linkKey] = struct{}{}
 			}
 		}
