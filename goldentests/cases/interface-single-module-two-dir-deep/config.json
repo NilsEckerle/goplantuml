@@ -1,0 +1,7 @@
+{
+  "recursive": true,
+  "aggregate-private-members": true,
+  "show-aggregations": true,
+  "show-compositions": true,
+  "show-implementations": true
+}
