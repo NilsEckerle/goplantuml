@@ -1,0 +1,30 @@
+@startuml
+namespace input {
+}
+namespace module1 {
+    class "ConcreteClass" << (S,Aquamarine) >> {
+        - x int
+
+        + Foo() 
+        + Bar(i int) int
+
+    }
+    interface "ISomeClass"  {
+        + Foo() 
+        + Bar(i int) int
+
+    }
+    class "SomethingThatUses" << (S,Aquamarine) >> {
+        - someClass ISomeClass
+
+        + Run() 
+
+    }
+}
+
+"input.src.module1.ISomeClass" <|-- "input.src.module1.ConcreteClass"
+
+"input.src.module1.SomethingThatUses" o-- "input.src.module1.ISomeClass"
+
+
+@enduml
